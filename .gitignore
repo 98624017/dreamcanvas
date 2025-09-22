@@ -11,3 +11,4 @@ src-py/.venv/
 __pycache__/
 .serena/
 self-test-report.json
+%SystemDrive%/
