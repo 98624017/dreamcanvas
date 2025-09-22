@@ -1,0 +1,21 @@
+[package]
+name = "dreamcanvas"
+version = "0.1.0"
+description = "DreamCanvas 桌面端"
+authors = ["DreamCanvas Team"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.70"
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tauri = { version = "2.0.0", features = ["shell-open", "event"] }
+tauri-plugin-log = "2.0.0"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

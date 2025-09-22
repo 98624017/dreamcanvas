@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - "release/**"
+  pull_request:
+    branches:
+      - main
+      - develop
+      - "release/**"
+
+jobs:
+  self-test:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: "9.7.0"
+          run_install: false
+
+      - name: Install Node dependencies
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        run: python -m pip install --upgrade pip poetry
+
+      - name: Install Python dependencies
+        run: |
+          cd src-py
+          poetry install --no-interaction --sync
+
+      - name: Prepare artifact directory
+        run: New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+
+      - name: Run self-test
+        run: ./scripts/self-test.ps1 -OutputPath artifacts/self-test-report.json
+
+      - name: Upload self-test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: self-test-report
+          path: artifacts/self-test-report.json
+          if-no-files-found: error

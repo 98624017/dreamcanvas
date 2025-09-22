@@ -1,0 +1,20 @@
+{
+  "name": "dreamcanvas",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.7.0",
+  "scripts": {
+    "dev": "pnpm --filter @dreamcanvas/desktop dev",
+    "build": "pnpm --filter @dreamcanvas/desktop build",
+    "lint": "pnpm -r lint && pnpm run lint:docs",
+    "lint:docs": "markdownlint-cli2 \"AGENTS.md\" \"docs/**/*.md\" \"apps/desktop/src/**/*.md\"",
+    "test": "pnpm -r test",
+    "format": "pnpm -r format",
+    "tauri": "pnpm --filter @dreamcanvas/desktop tauri dev",
+    "backend": "pwsh -NoLogo -File scripts/start-backend.ps1 -Reload -Detached",
+    "check": "pnpm lint && pnpm test"
+  },
+  "devDependencies": {
+    "markdownlint-cli2": "^0.18.1"
+  }
+}

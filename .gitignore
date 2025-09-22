@@ -1,0 +1,13 @@
+.env
+.env.local
+config.json
+config/secrets.enc
+node_modules/
+apps/desktop/.next/
+apps/desktop/out/
+apps/desktop/node_modules/
+apps/desktop/src-tauri/target/
+src-py/.venv/
+__pycache__/
+.serena/
+self-test-report.json
