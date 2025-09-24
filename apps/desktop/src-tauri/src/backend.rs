@@ -5,7 +5,7 @@ use std::sync::{atomic::{AtomicBool, Ordering}, Arc, Mutex};
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter, Manager};
 
 const SRC_PY_DIR: &str = "src-py";
 const STDOUT_EVENT: &str = "backend://stdout";
@@ -64,7 +64,7 @@ impl BackendManager {
           *guard = None;
           drop(guard);
           if !manual_flag.load(Ordering::SeqCst) {
-            let _ = app_handle.emit_all(
+            let _ = app_handle.emit(
               STOPPED_EVENT,
               BackendStoppedEvent {
                 reason: "exited".to_string(),
@@ -118,7 +118,7 @@ impl BackendManager {
       std::thread::spawn(move || {
         let reader = BufReader::new(stdout);
         for line in reader.lines().flatten() {
-          let _ = handle.emit_all(STDOUT_EVENT, line);
+          let _ = handle.emit(STDOUT_EVENT, line);
         }
       });
     }
@@ -128,7 +128,7 @@ impl BackendManager {
       std::thread::spawn(move || {
         let reader = BufReader::new(stderr);
         for line in reader.lines().flatten() {
-          let _ = handle.emit_all(STDERR_EVENT, line);
+          let _ = handle.emit(STDERR_EVENT, line);
         }
       });
     }
@@ -179,12 +179,12 @@ pub struct BackendStatus {
   backend_dir: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct BackendStartedEvent {
   backend_dir: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct BackendStoppedEvent {
   reason: String,
 }
@@ -193,7 +193,7 @@ pub struct BackendStoppedEvent {
 pub fn start_backend(app: AppHandle, reload: Option<bool>) -> Result<(), String> {
   let state = app.state::<BackendManager>();
   state.spawn(&app, reload.unwrap_or(false))?;
-  let _ = app.emit_all(
+  let _ = app.emit(
     STARTED_EVENT,
     BackendStartedEvent {
       backend_dir: state.backend_dir_string(),
@@ -206,7 +206,7 @@ pub fn start_backend(app: AppHandle, reload: Option<bool>) -> Result<(), String>
 pub fn stop_backend(app: AppHandle) -> Result<(), String> {
   let state = app.state::<BackendManager>();
   state.stop()?;
-  let _ = app.emit_all(
+  let _ = app.emit(
     STOPPED_EVENT,
     BackendStoppedEvent {
       reason: "manual".to_string(),

@@ -51,8 +51,18 @@ jobs:
       - name: Prepare artifact directory
         run: New-Item -ItemType Directory -Path artifacts -Force | Out-Null
 
-      - name: Run self-test
-        run: ./scripts/self-test.ps1 -OutputPath artifacts/self-test-report.json
+      - name: Run self-test (含 E2E)
+        run: ./scripts/self-test.ps1 -IncludeE2E -InstallBrowsers -OutputPath artifacts/self-test-report.json
+
+      - name: Collect Playwright artifacts
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/playwright | Out-Null
+          if (Test-Path 'apps/desktop/playwright/report') {
+            Copy-Item -Path 'apps/desktop/playwright/report' -Destination 'artifacts/playwright/report' -Recurse -Force
+          }
+          if (Test-Path 'apps/desktop/playwright/test-output') {
+            Copy-Item -Path 'apps/desktop/playwright/test-output' -Destination 'artifacts/playwright/test-output' -Recurse -Force
+          }
 
       - name: Upload self-test report
         uses: actions/upload-artifact@v4
@@ -60,3 +70,10 @@ jobs:
           name: self-test-report
           path: artifacts/self-test-report.json
           if-no-files-found: error
+
+      - name: Upload Playwright artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: artifacts/playwright
+          if-no-files-found: warn

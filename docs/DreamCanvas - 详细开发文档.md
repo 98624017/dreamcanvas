@@ -38,20 +38,19 @@ root
 
 #### **3. 模块职责 (Responsibilities)**
 - **Next.js 层**：
-  - `app/`：路由、布局与全局 Provider。
-  - `components/canvas/`：封装 Tldraw 组件与自定义工具栏。
-  - `components/panels/`：项目、素材库、提示词、任务面板。
-  - `lib/`：Tauri 调用封装、API Hook、持久化工具。
-  - `store/`：Zustand 管理项目、任务、UI 状态。
+  - `app/`：路由、布局与全局 Provider，首页整合项目侧栏、画布、提示词与任务面板。
+  - `modules/project/`：封装项目域逻辑，包含 Zustand store、Tauri/HTTP API 适配器、Tldraw 画布组件与素材、任务面板。
+  - `modules/system/`：后端健康轮询、Tauri 事件以及后台日志控制台。
+  - `lib/`：Tauri 调用封装、API Hook、持久化工具（后续继续沉淀）。
 - **Tauri Rust 层**：
   - 统一暴露 `list_projects`、`load_project`、`save_project`、`call_python_api` 等命令。
   - 管理 Python 子进程：启动、心跳、自愈，向日志目录写入监控信息。
   - 负责文件系统访问与加密解密接口（调用 Rust crate `ring`）。
 - **Python FastAPI 层**：
-  - `main.py`：应用入口、路由注册、生命周期事件（启动加载配置、初始化 TokenManager）。
-  - `api/`：`jimeng.py`、`tools.py`、`diagnostics.py`。
-  - `services/`：封装即梦 HTTP、LLM、图像处理、备份任务调度。
-  - `core/`：来自 `Comfyui_Free_Jimeng` 的 API 客户端与 token 管理实现，通过 Git 子模块跟踪。
+  - `main.py`：应用入口、路由注册、生命周期事件（启动加载配置、初始化 `SecretManager`、`ProjectStorage`、`JimengService`）。
+  - `api/`：`jimeng.py`（任务 CRUD 与取消）、`tools.py`（抠图/文本助手）、`system.py`（诊断与备份）。
+  - `services/`：`jimeng_client.py` 复刻官网签名/队列协议，`jimeng.py` 调用真实即梦文生成管线并负责本地状态与异常追踪；`projects.py` 负责磁盘持久化与摘要；`secret_manager.py` 加载加密凭据并提供明文回退。
+  - `core/`：保留与历史实现对齐的兼容封装，后续如需接入正式 API 再引入子模块。
 
 #### **4. 里程碑与工程交付 (Milestones)**
 | 阶段 | 技术重点 | 关键交付 | 验收要点 |
@@ -62,16 +61,17 @@ root
 | P3 GA 稳定 | 性能/备份优化、权限审计、发布流程 | 备份恢复工具、性能优化报告、CI 发布脚本、升级/回滚方案 | 性能指标达标、灾备演练通过、发布 Checklist 完整 |
 
 #### **5. 环境与配置 (Environment & Configuration)**
-- **前端**：Node.js 20 + pnpm，使用 `pnpm install`，开发时运行 `pnpm dev --filter web`。
-- **Rust/Tauri**：Rust stable + `tauri-cli`；`pnpm tauri dev` 作为统一启动命令。
+- **前端**：Node.js 20 + pnpm，使用 `pnpm install`，开发时运行 `pnpm --filter @dreamcanvas/desktop dev` 在浏览器中预览界面。
+- **Rust/Tauri**：Rust stable + `tauri-cli`；`pnpm tauri dev` 用于启动本地后端与启动器，可在 UI 内保存浏览器入口地址并选择是否自动打开（同时兼容 `DC_WEB_APP_URL` 环境变量）。
 - **Python**：推荐使用 `conda create -n dreamcanvas python=3.11` 或 venv；通过环境变量 `DC_PYTHON_BIN` 指定解释器路径，Tauri 启动时读取。
 - **配置文件**：
   - `config/default.env`：公共配置（API Endpoint、默认模型、日志级别）。
-  - `config/secrets.template.json`：本地填写敏感信息的明文模板。
+  - `config/secrets.template.json`：本地填写敏感信息的明文模板，包含 `jimeng` 凭据、Cloudflare Token 及可选本地代理 `proxy.http/https`。
+  - `config/secrets.local.json`：建议的明文副本，仓库已忽略；若缺少密文或口令，后端会回退读取该文件并输出安全警告。
   - `config/secrets.enc`：通过 `dc-cli secrets encrypt --input config/secrets.template.json` 生成的密文，随代码库提交。
   - `src-py/config/config.yaml`：后端参数（模型、尺寸映射、超时等），支持按阶段覆盖。
-- **脚本**：`scripts/setup.ps1` 自动完成依赖检查、Python 环境核对、子模块同步、加密文件生成；`scripts/start-backend.ps1` 负责以 `uvicorn` 启动 FastAPI 服务（支持 `-Reload`、后台模式与自定义监听地址）；`scripts/self-test.ps1` 用于一键执行 lint/test/pytest 并输出 JSON 报告；`scripts/collect-logs.ps1` 打包日志、运行手册与依赖树。
-- **Tauri 命令**：`start_backend`、`stop_backend`、`backend_status` 由 `BackendManager` 托管 Python 子进程，并将 stdout/stderr 通过事件 `backend://stdout`、`backend://stderr` 推送给前端，实现桌面端的实时日志调试。
+- **脚本**：`scripts/setup.ps1` 自动完成依赖检查、Python 环境核对、子模块同步、加密文件生成；`scripts/start-backend.ps1` 负责以 `uvicorn` 启动 FastAPI 服务（支持 `-Reload`、后台模式与自定义监听地址）；`scripts/self-test.ps1` 用于一键执行 lint/test/pytest（可选附加 Playwright E2E）并输出 JSON 报告；`scripts/collect-logs.ps1` 打包日志、运行手册与依赖树；如需本地运行 E2E，先执行 `pnpm exec playwright install --with-deps`。
+- **Tauri 命令**：`start_backend`、`stop_backend`、`backend_status` 由 `BackendManager` 托管 Python 子进程；stdout/stderr 依旧通过事件 `backend://stdout`、`backend://stderr` 推送给浏览器界面，客户端窗口主要承担启动、日志抛出及设置入口。
 
 #### **6. 数据持久化与目录布局 (Data Persistence)**
 ```
@@ -81,7 +81,7 @@ root
 │       ├── manifest.json        # 项目元数据、版本、校验和
 │       ├── canvas.json          # Tldraw Snapshot (gzip+base64)
 │       ├── assets/
-│       │   ├── images/          # 原始/生成图片，文件名={assetId}.png
+│       │   ├── images/          # 即梦任务成功后自动落地的 PNG，命名规则 {taskId}-{index}.png（metadata.sourceUri 保留原始链接）
 │       │   ├── prompts/         # 提示词模板，.json
 │       │   └── components/      # 视觉助手生成的组件片段
 │       ├── history/             # 任务调用历史，按日期分文件
@@ -89,8 +89,8 @@ root
 ├── backups/                     # 增量备份，命名 {date}-{projectId}.bak
 └── logs/                        # Rust、Python、前端日志（JSON Lines）
 ```
-- 所有写操作遵循“临时文件 → 校验 → 原子替换”流程。
-- 备份任务由 Python APScheduler 在每日 02:00 执行，保留最近 7 天并支持 CLI 恢复。
+- Tauri `ProjectManager` 与 Python `ProjectStorage` 共同遵循上述目录规范，写入采用“临时文件 → 校验 → 原子替换”流程。
+- 备份任务由 Python APScheduler 负责计划执行，手动触发则通过 `/system/backup` 即时产出 zip 包。
 
 #### **7. 核心数据结构 (Type Definitions)**
 ```typescript
@@ -148,13 +148,13 @@ export interface GenerationRecord {
 
 | Endpoint | 方法 | 描述 |
 | --- | --- | --- |
-| `/jimeng/generate` | POST | 支持文生图/图生图，根据 payload 判断模式；包含重试与轮询逻辑 |
-| `/jimeng/history` | GET | 查询任务状态，供前端订阅更新 |
-| `/tools/segment_image` | POST | rembg 抠图，返回 base64 PNG |
-| `/tools/llm_text` | POST | 调用 Cloudflare Gateway 代理的 LLM，返回响应文本 |
-| `/tools/llm_vision` | POST | 上传画布截图并获取组件描述或 UI 片段 |
-| `/system/diagnostics` | GET | 返回版本、依赖、健康检查结果 |
-| `/system/backup` | POST | 触发备份任务或恢复指定备份 |
+| `/jimeng/tasks` | POST | 提交即梦文生图任务并触发真实 API，返回本地任务 ID、队列信息与初始状态 |
+| `/jimeng/history` | GET | 根据 `taskId` 查询任务最新状态，供前端轮询与面板展示 |
+| `/jimeng/tasks/{taskId}/cancel` | POST | 取消运行中的任务，返回最新状态（若已完成则提示冲突） |
+| `/tools/segment_image` | POST | 基于 Pillow 实现的前景抠图演示，输出带透明通道的 base64 PNG |
+| `/tools/llm_text` | POST | 文本助手占位实现，给出润色建议与提示词优化列表 |
+| `/system/diagnostics` | GET | 汇总版本、阶段、日志目录、项目摘要与任务概况 |
+| `/system/backup` | POST | 打包项目目录为 zip 并返回存储路径，供诊断与灾备验证 |
 
 #### **9. 运行时流程 (Runtime Flow)**
 1. Tauri 启动 Rust 主进程，读取 `DC_PYTHON_BIN` 并检查解释器；若缺失提示执行 `scripts/setup.ps1`。
@@ -166,7 +166,7 @@ export interface GenerationRecord {
 
 #### **10. 观测与性能 (Observability & Performance)**
 - **指标埋点**：任务排队时长、生成耗时、失败原因、备份耗时、画布保存耗时。
-- **日志格式**：统一使用 JSON Lines，字段包含 `timestamp`、`module`、`level`、`message`、`context`。
+- **日志格式**：统一使用 JSON Lines，字段包含 `timestamp`、`module`、`level`、`message`、`context`；`JimengService` 额外记录 `submit/poll/failed` trace，支持诊断 API 错误码与超时。
 - **性能目标**：
   - 首屏渲染≤3 秒；画布交互帧率≥55fps；素材库搜索≤1 秒。
   - 即梦任务 95% 在 90 秒内完成首次结果。
@@ -174,8 +174,9 @@ export interface GenerationRecord {
 - **测试策略**：提供 Vitest/Playwright 前端测试、Pytest 后端测试、k6 压测脚本模拟任务高峰。
 
 #### **11. 安全与凭据管理 (Security)**
-- 凭据全部存储在 `config/secrets.enc`，通过 PBKDF2+Fernet 加密；使用 `dc-cli secrets encrypt`/`decrypt` 管理密文，`SecretManager` 负责运行期读取与缓存。
-- 运行时需要在桌面端或 CI 中设置 `DC_SECRETS_PASSPHRASE`，后端启动时即可解密凭据；未提供口令会触发显式错误提醒。
+- 凭据首选 `config/secrets.enc` 加密存储（PBKDF2+Fernet）；借助 `dc-cli secrets encrypt`/`decrypt` 管理密文，`SecretManager` 负责运行期读取与缓存。模板中新增 `proxy.http/https` 字段，可直接指定本地代理，例如 `http://127.0.0.1:7897`。
+- `JimengService` 启动时读取解密结果初始化 `JimengClient`，按照官网协议动态生成 `msToken/a_bogus/sign` 并透传队列信息；所有请求都会记录 trace 与错误码，便于排查 `1015/1016/1003` 等常见风控。
+- 若暂未生成密文或设置 `DC_SECRETS_PASSPHRASE`，`SecretManager` 会回退读取 `config/secrets.local.json` 并记录警告日志，提醒尽快加密。提供口令后会优先解密密文并刷新缓存。
 - sessionid 更新流程：前端触发 → 运行 `dc-cli secrets decrypt` 导出明文或更新模板 → 加密后写回密文 → FastAPI 通过 `SecretManager` 刷新缓存。
 - 日志默认脱敏：当记录 HTTP 请求时，仅保留 hash 后 sessionid，禁止写入明文。
 - 外部请求通过 Cloudflare Gateway 控制速率；配置文件中可设置全局速率限制，避免触发即梦风控。
@@ -194,9 +195,10 @@ export interface GenerationRecord {
 #### **14. 测试与 CI 流水线 (Testing & CI)**
 - **CI 平台**：GitHub Actions（`ci.yml`）采用 Windows runner，执行统一自检流程并上传自检报告。
 - **任务拆分**：
-  - `self-test`：`scripts/self-test.ps1` 串行执行 `pnpm --filter @dreamcanvas/desktop lint`、`pnpm run lint:docs`、`pnpm --filter @dreamcanvas/desktop test`、`python -m poetry run pytest`，输出 JSON 报告。
-  - `e2e`：Playwright 运行关键用户路径脚本，使用项目模板数据启动 Tauri 应用。
+  - `self-test`：`scripts/self-test.ps1` 串行执行 `pnpm --filter @dreamcanvas/desktop lint`、`pnpm run lint:docs`、`pnpm --filter @dreamcanvas/desktop test`、`python -m poetry run pytest`，并默认携带 `-IncludeE2E` 跑 Playwright，生成 JSON 报告与截图；本地可通过省略该参数加速调试。
+  - `e2e`：Playwright 覆盖“创建项目→提交即梦任务→任务面板/素材库回收”闭环，使用 Next.js dev server + HTTP mock；脚本位于 `apps/desktop/playwright/project-flow.spec.ts`。
   - `perf`：k6 压测脚本按周定时运行，记录即梦任务延迟与备份耗时。
+- **实测记录**：2025-09-22 完成真实即梦单图任务 `4265368139020`、多图任务 `4265076452108`，平均排队 5.4s；抠图接口示例输出位于 `tests/output/segment_alpha.png`。
 - **准入门槛**：任何管道失败阻止合并；`self-test` 为 PR 准入必选项，覆盖率低于阈值或基线性能回退时需提供豁免说明。
 - **工具支持**：`scripts/self-test.ps1` 已纳入 CI；`scripts/run-e2e.ps1`、`scripts/run-perf.ps1` 可按需在流水线中扩展，结果通过 Allure 或 HTML 报告存档。
 

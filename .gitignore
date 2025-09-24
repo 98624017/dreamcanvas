@@ -2,11 +2,14 @@
 .env.local
 config.json
 config/secrets.enc
+config/secrets.local.json
 node_modules/
 apps/desktop/.next/
 apps/desktop/out/
 apps/desktop/node_modules/
 apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/icons/
 src-py/.venv/
 __pycache__/
 .serena/

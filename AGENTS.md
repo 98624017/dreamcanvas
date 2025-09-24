@@ -1,8 +1,8 @@
 # Repository Guidelines
 
 ## 项目结构与模块组织
-- `apps/desktop/`：Next.js + Tauri 桌面端，`src/app/` 为 App Router 入口，`src/modules/` 预留画布、素材、任务等子模块。
-- `apps/desktop/src-tauri/`：Rust 核心，负责窗口、文件系统与 Python 子进程调度。
+- `apps/desktop/`：Next.js + Tauri 桌面端，`src/app/` 为 App Router 入口，`src/modules/` 聚合系统与项目域功能；`playwright/` 存放 E2E 脚本与配置。
+- `apps/desktop/src-tauri/`：Rust 核心，负责窗口、文件系统与 Python 子进程调度，`src/project.rs` 管理磁盘项目存储。
 - `src-py/`：使用 Poetry 管理的 FastAPI 服务，`dreamcanvas/api/` 暴露系统、即梦、工具路由。
 - `tests/`：跨栈脚本集合，`perf/` 保存 k6 压测用例。
 - `%APPDATA%/DreamCanvas/`：运行期项目、备份、日志目录；结构详见 `docs/DreamCanvas - 详细开发文档.md`。
@@ -14,9 +14,10 @@
 - Shell=PowerShell > `cd src-py; poetry install && poetry run pytest`：安装并执行后端测试。
 - Shell=PowerShell > `scripts/setup.ps1`：环境自检、目录初始化、`.env` 与 `secrets.enc` 模板准备。
 - Shell=PowerShell > `pnpm backend`：后台启动 FastAPI（默认 `--reload`），终端可直接返回；如需前台调试使用 `scripts/start-backend.ps1 -Reload`。
+- Shell=PowerShell > `pnpm exec playwright install --with-deps`：首次运行 Playwright 前安装浏览器依赖。
 - Shell=PowerShell > `scripts/run-e2e.ps1 [-InstallBrowsers]`：启动 Playwright E2E；`scripts/run-perf.ps1` 触发 k6 压测。
 - Shell=PowerShell > `scripts/self-test.ps1 [-IncludeE2E] [-InstallBrowsers]`：一键执行 lint/test/pytest（可选 E2E），并生成 JSON 报告。
-- Shell=PowerShell > `dc-cli secrets encrypt --input config/secrets.template.json --output config/secrets.enc`：使用主口令加密敏感配置。
+- Shell=PowerShell > `dc-cli secrets encrypt --input config/secrets.template.json --output config/secrets.enc`：使用主口令加密敏感配置；如需明文配置进行调试，可执行 `dc-cli secrets init --template ... --output config/secrets.json` 生成副本。
 - Shell=PowerShell > `scripts/collect-logs.ps1 [-IncludeSelfTest] [-IncludePoetryTree]`：打包日志、运行手册与诊断信息，便于问题排查。
 - Tauri 内置命令：`start_backend`、`stop_backend`、`backend_status` 用于管理 FastAPI 子进程；前端通过 `@/modules/system/backendClient` 调用，并将日志广播到 `backend://stdout`/`backend://stderr` 事件。
 ## 代码风格与命名规范
@@ -38,7 +39,7 @@
 ## 安全与配置提示
 - 不提交 `config/secrets.enc` 明文或解密结果；敏感调试日志先执行 `scripts/redact.ps1`。
 - Python 解释器路径通过 `DC_PYTHON_BIN` 控制；运行 `scripts/setup.ps1` 后确认脚本输出。
-- 凭据管理：使用 `dc-cli secrets encrypt` 维护密文，并在本地/CI 设置 `DC_SECRETS_PASSPHRASE`；详情参阅 `docs/DreamCanvas - 详细开发文档.md` 第 11 章。
+- 凭据管理：使用 `dc-cli secrets encrypt` 维护密文，并在本地/CI 设置 `DC_SECRETS_PASSPHRASE`；如需代理，可在 `config/secrets.template.json` 的 `proxy.http/https` 字段写入，例如 `http://127.0.0.1:7897`。
 
 ## 发布、版本与回滚
 - 分支模型：`main` + `develop` + `release/Px`，阶段结束在 `main` 打 `vP{阶段}.{迭代}.{修订}` 标签。

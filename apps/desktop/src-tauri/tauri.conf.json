@@ -3,26 +3,31 @@
   "version": "0.1.0",
   "identifier": "com.dreamcanvas.app",
   "build": {
-    "frontendDist": "../.next",
-    "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build"
+    "frontendDist": "./launcher"
   },
-  "tauri": {
-    "windows": [{
-      "title": "DreamCanvas",
-      "width": 1280,
-      "height": 800,
-      "minWidth": 960,
-      "minHeight": 640,
-      "resizable": true
-    }],
-    "bundle": {
-      "active": true,
-      "targets": "all"
-    },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "DreamCanvas",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 640,
+        "resizable": true
+      }
+    ],
     "security": {
       "csp": null
     }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.ico",
+      "icons/icon.icns",
+      "icons/icon.png"
+    ]
   }
 }

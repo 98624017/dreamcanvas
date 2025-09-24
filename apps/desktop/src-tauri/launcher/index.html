@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DreamCanvas 客户端启动器</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+      }
+      body {
+        margin: 0;
+        background: #f5f7fb;
+        color: #1f2937;
+        display: flex;
+        min-height: 100vh;
+        align-items: center;
+        justify-content: center;
+      }
+      main {
+        width: min(600px, calc(100% - 32px));
+        padding: 32px;
+        border-radius: 16px;
+        background: white;
+        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12);
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 24px;
+      }
+      p {
+        margin: 8px 0;
+        line-height: 1.6;
+        font-size: 14px;
+      }
+      form {
+        margin-top: 24px;
+        padding: 16px;
+        border-radius: 12px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #334155;
+      }
+      input[type="text"] {
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid #cbd5f5;
+        font-size: 13px;
+        transition: border-color 0.2s;
+      }
+      input[type="text"]:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+      }
+      .checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #475569;
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      button {
+        padding: 10px 16px;
+        border-radius: 8px;
+        border: none;
+        font-size: 13px;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+      button.primary {
+        background: #2563eb;
+        color: white;
+        box-shadow: 0 10px 18px rgba(37, 99, 235, 0.25);
+      }
+      button.secondary {
+        background: white;
+        color: #1f2937;
+        border: 1px solid #cbd5f5;
+      }
+      button:hover {
+        transform: translateY(-1px);
+      }
+      .message {
+        font-size: 12px;
+        margin-top: 12px;
+      }
+      .message.success {
+        color: #15803d;
+      }
+      .message.error {
+        color: #b91c1c;
+      }
+      footer {
+        margin-top: 24px;
+        font-size: 12px;
+        color: #64748b;
+      }
+      code {
+        background: #e2e8f0;
+        border-radius: 4px;
+        padding: 2px 4px;
+      }
+    </style>
+    <script type="module">
+      const resolveInvoke = () => window.__TAURI__?.core?.invoke ?? window.__TAURI__?.invoke ?? null;
+
+      const ensureInvoke = () => {
+        const fn = resolveInvoke();
+        if (!fn) {
+          throw new Error("Tauri API 不可用");
+        }
+        return fn;
+      };
+
+      const waitForInvoke = async (retries = 10, delay = 50) => {
+        for (let attempt = 0; attempt < retries; attempt += 1) {
+          const fn = resolveInvoke();
+          if (fn) {
+            return fn;
+          }
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+        return ensureInvoke();
+      };
+
+      document.addEventListener("DOMContentLoaded", async () => {
+        const invoke = async (...args) => {
+          const fn = await waitForInvoke();
+          return fn(...args);
+        };
+        const urlInput = document.getElementById("web-app-url");
+        const autoOpenCheckbox = document.getElementById("auto-open");
+        const saveButton = document.getElementById("save-settings");
+        const openButton = document.getElementById("open-webapp");
+        const messageBox = document.getElementById("message-box");
+
+        const setMessage = (text, type = "success") => {
+          messageBox.textContent = text;
+          messageBox.className = `message ${type}`;
+        };
+
+        try {
+          const settings = await invoke("load_settings");
+          if (settings?.web_app_url) {
+            urlInput.value = settings.web_app_url;
+          }
+          autoOpenCheckbox.checked = !!settings?.auto_open;
+        } catch (error) {
+          setMessage(`加载设置失败：${error}`, "error");
+        }
+
+        saveButton.addEventListener("click", async (event) => {
+          event.preventDefault();
+          saveButton.disabled = true;
+          try {
+            await invoke("save_settings", {
+              settings: {
+                web_app_url: urlInput.value.trim() || null,
+                auto_open: autoOpenCheckbox.checked,
+              },
+            });
+            setMessage("设置已保存");
+          } catch (error) {
+            setMessage(`保存失败：${error}`, "error");
+          } finally {
+            saveButton.disabled = false;
+          }
+        });
+
+        openButton.addEventListener("click", async (event) => {
+          event.preventDefault();
+          openButton.disabled = true;
+          try {
+            await invoke("open_web_app");
+            setMessage("已请求在浏览器中打开前端界面");
+          } catch (error) {
+            setMessage(`打开失败：${error}`, "error");
+          } finally {
+            openButton.disabled = false;
+          }
+        });
+      });
+    </script>
+  </head>
+  <body>
+    <main>
+      <h1>DreamCanvas 客户端已启动</h1>
+      <p>本地后端服务已就绪。主画板界面在浏览器中运行，请在下方设置页面地址。</p>
+
+      <form>
+        <label for="web-app-url">浏览器访问地址（例如 <code>http://127.0.0.1:3000</code>）</label>
+        <input
+          id="web-app-url"
+          type="text"
+          placeholder="请输入前端入口 URL"
+          autocomplete="off"
+        />
+
+        <label class="checkbox">
+          <input id="auto-open" type="checkbox" />
+          启动客户端时自动在浏览器打开该地址
+        </label>
+
+        <div class="actions">
+          <button id="save-settings" class="primary">保存设置</button>
+          <button id="open-webapp" class="secondary" type="button">立即在浏览器打开</button>
+        </div>
+
+        <div id="message-box" class="message"></div>
+      </form>
+
+      <footer>
+        设置会保存在本地配置文件夹（Windows: <code>%APPDATA%/DreamCanvas/ui-settings.json</code>）。
+        如需更换地址，只需更新表单并保存，再次启动客户端即可生效。
+      </footer>
+    </main>
+  </body>
+</html>

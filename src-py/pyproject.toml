@@ -16,6 +16,7 @@ pydantic-settings = "^2.4.0"
 python-multipart = "^0.0.9"
 tenacity = "^8.3.0"
 cryptography = "^43.0.0"
+pillow = "^10.4.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.0"

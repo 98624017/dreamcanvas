@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import "tldraw/tldraw.css";
 import "./globals.css";
 
 export const metadata = {
